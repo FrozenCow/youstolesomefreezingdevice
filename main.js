@@ -27,6 +27,12 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
         var images = g.resources.images;
         var audio = g.resources.audio;
 
+        for(var k in audio) {
+            var a = audio[k];
+            if (!a instanceof Audio) { continue; }
+            a.volume = 0.6;
+        }
+
         // audio.explosions = [audio.explosion01,audio.explosion02,audio.explosion03];
         audio.explosions = [audio.explosion04,audio.explosion05,audio.explosion06,audio.explosion07];
 
