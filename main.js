@@ -969,10 +969,10 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
                             g.drawCenteredImage(images.tailPropellor, 0, 0);
                         });
 
-                        g.translate(-289, 62, function() {
-                            g.context.rotate(0);
-                            g.drawImage(images.gun, 11, -11);
-                        });
+                        // g.translate(-289, 62, function() {
+                        //     g.context.rotate(0);
+                        //     g.drawImage(images.gun, 11, -11);
+                        // });
                     }.bind(this));
                 }.bind(this));
 
