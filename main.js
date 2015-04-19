@@ -2,7 +2,9 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
     var t = new Vector(0, 0);
     var t2 = new Vector(0, 0);
     var rs = {
-        'images': ['background','ice','icepuff','enemy','bullet','icebullet','icefractal'],
+        'images': ['background','ice','icepuff','enemy','bullet','icebullet','icefractal',
+        'helicopter_body','helicopter_main_propellor','helicopter_tail_propellor','helicopter_gun',
+        'player_body', 'player_gun', 'player_hand'],
         'audio': []
     };
     var g, game;
@@ -36,7 +38,6 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
                 srcContext.drawImage(image, 0, 0);
                 var imageData = srcContext.getImageData(0,0,w,h);
 
-                console.log(imageData.data.length);
                 for(var i=0;i<imageData.data.length;i+=4) {
                     imageData.data[i] = 255;
                     imageData.data[i+1] = 255;
@@ -170,7 +171,7 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
                 // game.camera.x = 0.8 * game.camera.x + 0.2 * targetx;
                 // game.camera.y = 0.8 * game.camera.y + 0.2 * targety;
                 // No smoothing
-                game.camera.x = Math.max(game.camera.x, targetx);
+                game.camera.x = Math.max(game.camera.x+1, targetx);
                 game.camera.y = targety;
                 // g.save();
                 // g.context.translate(-x*ptm,y*ptm);
@@ -473,6 +474,10 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
             this.line = undefined;
             this.lineOffset = 0;
             this.lineSpeed = 0;
+            this.fireCooldown = 0;
+            this.fireRate = 0.2;
+            this.angle = 0;
+            this.aimPosition = new Vector(1,0);
             this.iceSmokeEmitter = new ParticleEmitter(images.icepuff, 100, 0.005, function(particle) {
                 if (!this.path) { return; }
                 particle.posx = this.path.lastPoint().x + rnd()*3;
@@ -522,6 +527,8 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
             p.update = function(dt) {
                 var me = this;
 
+                this.fireCooldown -= dt;
+
                 this.iceFractalEmitter.update(dt);
                 this.iceSmokeEmitter.update(dt);
 
@@ -545,11 +552,23 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
                     }
 
                     var line = this.line || previousLine;
+
+                    // Position on the line
                     this.position.setV(line.end);
                     this.position.substractV(line.start);
                     this.position.normalize();
                     this.position.multiply(this.lineOffset);
                     this.position.addV(line.start);
+
+                    var m = 1;
+                    if (line.normal.y < 0) {
+                        m = -1;
+                    }
+                    // Offset of line
+                    this.position.add(
+                        m*line.normal.x * 26,
+                        m*line.normal.y * 26
+                    );
 
                     var t = new Vector(0,0);
                     t.setV(line.end);
@@ -571,16 +590,45 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
                     this.velocity.normalize();
                     this.velocity.multiply(maxspeed);
                 }
+
+                var desiredAngle = 0;
+                if (this.line) {
+                    desiredAngle = Math.atan2(-this.line.normal.x, -this.line.normal.y);
+                }
+                this.angle = desiredAngle;
             };
             p.draw = function(g) {
                 var me = this;
                 // g.fillStyle(this.velocity.length() >= 0.8 ? 'red' : 'blue');
             };
             p.drawForeground = function(g) {
-                g.fillStyle('hsl('+Math.floor(((game.time*50)%360))+', 76%, 53%)')
-                g.fillRectangle(this.position.x-5,this.position.y-5,10,10);
+                // g.fillStyle('hsl('+Math.floor(((game.time*50)%360))+', 76%, 53%)')
+                // g.fillRectangle(this.position.x-5,this.position.y-5,10,10);
                 this.iceFractalEmitter.draw(g);
                 this.iceSmokeEmitter.draw(g);
+
+                g.strokeStyle('blue');
+                g.strokeCircle(this.aimPosition.x, this.aimPosition.y, 30);
+
+                g.translate(this.position.x, this.position.y, function() {
+                    g.context.scale(1, -1);
+                    g.context.scale(0.8, 0.8);
+                    g.rotate(0,0,this.angle,function() {
+                        if (Math.cos(this.angle) < 0) {
+                            g.context.scale(1, -1);
+                        }
+                        g.drawCenteredImage(images.player_body, 0, 0);
+                    }.bind(this))
+
+                    var gunAngle = Math.atan2(
+                        this.aimPosition.y - this.position.y,
+                        this.aimPosition.x - this.position.x
+                    );
+                    g.context.scale(1,-1);
+                    g.rotate(0,0,gunAngle, function() {
+                        g.drawCenteredImage(images.player_gun, 25, 0);
+                    }.bind(this));
+                }.bind(this));
             };
             p.touch = function(other) {
                 var me = this;
@@ -601,11 +649,13 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
                 this.line = this.path.collisionlines[0];
                 this.lineOffset = 0;
                 this.lineSpeed = this.line.end.clone().substractV(this.line.start).dotV(this.velocity);
-                console.log(this.path, this.line, this.lineOffset, this.lineSpeed);
                 this.iceFractalEmitter.spawn(10);
             };
             p.growPath = function(x,y) {
                 var lastPoint = this.path.lastPoint();
+
+                this.aimPosition.setV(lastPoint);
+
                 var t = new Vector(0,0);
                 t.set(x,y);
                 t.substractV(lastPoint);
@@ -622,15 +672,16 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
                 this.path = null;
             },
             p.fire = function(x,y) {
-                console.log('fire');
+                if (this.fireCooldown > 0) { return; }
                 var t = new Vector(x,y);
                 t.substractV(this.position);
                 t.normalize();
-                t.multiply(10);
+                t.multiply(20);
                 var bullet = new Bullet(this, images.icebullet,
                     this.position.x, this.position.y,
                     t.x, t.y);
                 game.objects.add(bullet);
+                this.fireCooldown = this.fireRate;
             };
         })(Player.prototype);
 
@@ -720,7 +771,7 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
             this.image = image;
             this.health = health;
             this.damageTime = 0;
-            this.touchRadius = 30;
+            this.touchRadius = 56;
         }
         (function(p) {
             p.updatable = true;
@@ -743,12 +794,59 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
                 console.log('damage',amount);
                 this.health -= amount;
                 this.damageTime = 0.1;
-                if (this.health < 0) {
+                if (this.health <= 0) {
                     game.objects.remove(this);
                 }
             };
         })(Enemy.prototype);
 
+        function Helicopter(x,y) {
+            Enemy.call(this, null, x, y, -1, 0, 5);
+        }
+        Helicopter.prototype = new Enemy();
+        (function(p) {
+            p.images = {
+                body: images.helicopter_body,
+                mainPropellor: images.helicopter_main_propellor,
+                tailPropellor: images.helicopter_tail_propellor,
+                gun: images.helicopter_gun
+            };
+            p.imagesMasked = {
+                body: images.helicopter_body.mask,
+                mainPropellor: images.helicopter_main_propellor.mask,
+                tailPropellor: images.helicopter_tail_propellor.mask,
+                gun: images.helicopter_gun.mask
+            };
+            p.drawForeground = function(g) {
+                var damaged = this.damageTime > 0;
+                var shake = damaged ? 10 : 0;
+
+                var images = damaged ? this.imagesMasked : this.images;
+
+                g.translate(90 + rnd() * shake + this.position.x, 10 + rnd() * shake + this.position.y, function() {
+                    g.scale(0, 0, 0.8, -0.8, function() {
+                        g.drawCenteredImage(images.body, 0, 0);
+                        g.translate(-74, -49, function() {
+                            g.context.scale(Math.sin(game.time * 40), 1);
+                            g.drawCenteredImage(images.mainPropellor, 0, 0);
+                        }.bind(this));
+
+                        g.translate(240, -20, function() {
+                            g.context.rotate(game.time * 120);
+                            g.drawCenteredImage(images.tailPropellor, 0, 0);
+                        });
+
+                        g.translate(-289, 62, function() {
+                            g.context.rotate(0);
+                            g.drawImage(images.gun, 11, -11);
+                        });
+                    }.bind(this));
+                }.bind(this));
+
+                g.strokeStyle('red');
+                g.strokeCircle(this.position.x, this.position.y, this.touchRadius);
+            };
+        })(Helicopter.prototype);
         game.chains.draw.push(function(g,next) {
             g.fillStyle('white');
             g.fillRectangle(-100,-100,200,200);
@@ -762,7 +860,7 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
         game.objects.add(player = new Player());
         setInterval(function() {
             // game.objects.add(new Bullet(null, images.enemy, game.camera.x + game.width, 200, -1, 0));
-            game.objects.add(new Enemy(images.enemy, game.camera.x + game.width, 0, -1, 0, 5));
+            game.objects.add(new Helicopter(game.camera.x + game.width, 0, -1, 0, 5));
         },3000);
 
         //#states
@@ -795,11 +893,16 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
             }
 
             function update(dt, next) {
+                var t = new Vector(0,0);
+                getAimPosition(t);
+
+                player.aimPosition.setV(t);
+
                 // Post update
                 if (player.path) {
-                    var t = new Vector(0,0);
-                    getAimPosition(t);
                     player.growPath(t.x,t.y);
+                } else if (game.mouse.buttons[2]) {
+                    player.fire(t.x,t.y);
                 }
 
                 next(dt);
@@ -819,8 +922,6 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
                 getAimPosition(t);
                 if (button === 0) {
                     player.startPath(t.x,t.y);
-                } else if (button === 2) {
-                    player.fire(t.x,t.y);
                 }
             }
 
