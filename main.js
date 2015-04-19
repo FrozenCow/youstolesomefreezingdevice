@@ -4,8 +4,9 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
     var rs = {
         'images': ['background','ice','icepuff','enemy','bullet','icebullet','icefractal',
         'helicopter_body','helicopter_main_propellor','helicopter_tail_propellor','helicopter_gun',
-        'player_body', 'player_gun', 'player_hand'],
-        'audio': []
+        'player_body', 'player_gun', 'player_hand',
+        'youdied','youwon','instructions'],
+        'audio': ['explosion01','explosion02','explosion03','explosion04','explosion05','explosion06','explosion07','bigexplosion01','bigexplosion02','hurt','freeze','won']
     };
     var g, game;
     platform.once('load', function() {
@@ -25,6 +26,9 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
         }
         var images = g.resources.images;
         var audio = g.resources.audio;
+
+        // audio.explosions = [audio.explosion01,audio.explosion02,audio.explosion03];
+        audio.explosions = [audio.explosion04,audio.explosion05,audio.explosion06,audio.explosion07];
 
         (function() {
             for(var name in images) {
@@ -66,7 +70,6 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
         g.objects.lists.background = g.objects.createIndexList('background');
         g.objects.lists.foreground = g.objects.createIndexList('foreground');
         g.objects.lists.grounded = g.objects.createIndexList('grounded');
-        g.objects.lists.path = g.objects.createIndexList('path');
 
         var background = document.getElementById('background');
         var backgroundContext = background.getContext('2d');
@@ -158,6 +161,22 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
 
             function drawCamera(g, next) {
                 var ptm = getPixelsPerMeter();
+                // g.save();
+                // g.context.translate(-x*ptm,y*ptm);
+                // g.fillStyle(pattern);
+                // g.fillRectangle(x*ptm,-y*ptm,game.width,game.height);
+                // g.restore();
+                g.save();
+                g.context.scale(ptm, -ptm);
+                g.context.lineWidth /= ptm;
+                g.context.translate(-game.camera.x, -game.camera.y);
+                next(g);
+                g.restore();
+            }
+
+            function updateCamera(dt, next) {
+                next(dt);
+                var ptm = getPixelsPerMeter();
                 // if (!pattern) {
                 //   pattern = g.context.createPattern(images.background,'repeat');
                 // }
@@ -173,45 +192,43 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
                 // No smoothing
                 game.camera.x = Math.max(game.camera.x+1, targetx);
                 game.camera.y = targety;
-                // g.save();
-                // g.context.translate(-x*ptm,y*ptm);
-                // g.fillStyle(pattern);
-                // g.fillRectangle(x*ptm,-y*ptm,game.width,game.height);
-                // g.restore();
-                g.save();
-                g.context.scale(ptm, -ptm);
-                g.context.lineWidth /= ptm;
-                g.context.translate(-game.camera.x, -game.camera.y);
-                next(g);
-                g.restore();
             }
+
+            g.chains.update.camera = updateCamera;
+            g.chains.update.push(updateCamera);
+
             g.chains.draw.camera = drawCamera;
             g.chains.draw.insertBefore(drawCamera, g.chains.draw.objects);
         })();
 
         // Draw background
-        // (function() {
-        //     var topLeft = new Vector(0,0);
-        //     var bottomRight = new Vector(0,0);
-        //     game.chains.draw.insertAfter(function(g,next) {
-        //         var pixelSize = 1;
-        //         var worldSize = pixelSize * game.camera.PTM;
-        //         t.set(0,0);
-        //         game.camera.screenToWorld(t,topLeft);
-        //         t.set(game.width,game.height);
-        //         game.camera.screenToWorld(t,bottomRight);
-        //         topLeft.x = Math.floor(topLeft.x / worldSize) * worldSize;
-        //         topLeft.y = Math.floor(topLeft.y / worldSize) * worldSize;
-        //         bottomRight.x = Math.floor(bottomRight.x / worldSize + 1) * worldSize;
-        //         bottomRight.y = Math.floor(bottomRight.y / worldSize - 1) * worldSize;
-        //         for(var x = topLeft.x; x <= bottomRight.x; x += worldSize) {
-        //         for(var y = topLeft.y; y >= bottomRight.y; y -= worldSize) {
-        //             g.drawImage(images.background,x,y,worldSize,worldSize);
-        //         }}
-        //         next(g);
+        (function() {
+            var topLeft = new Vector(0,0);
+            var bottomRight = new Vector(0,0);
+            game.chains.draw.insertAfter(function(g,next) {
+                var image = images.background;
+                game.camera.screenToWorld(new Vector(0,0), topLeft);
+                game.camera.screenToWorld(new Vector(game.width,game.height), bottomRight);
 
-        //     },game.chains.draw.camera);
-        // })
+                var k = topLeft.y;
+                topLeft.y = bottomRight.y;
+                bottomRight.y = k;
+
+                topLeft.x = Math.floor(topLeft.x / image.width) * image.width;
+                topLeft.y = Math.floor(topLeft.y / image.height) * image.height;
+
+                bottomRight.x = Math.ceil(bottomRight.x / image.width) * image.width;
+                bottomRight.y = Math.ceil(bottomRight.y / image.height) * image.height;
+
+                for(var x=topLeft.x;x<bottomRight.x;x+= image.width)
+                for(var y=topLeft.y;y<bottomRight.y;y+=image.height) {
+                    g.drawImage(image, x, y);
+                }
+
+                next(g);
+
+            },game.chains.draw.camera);
+        })();
 
         // Collision
         var handleCollision = (function() {
@@ -459,10 +476,6 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
             };
         }
 
-        function slide(a, b) {
-            return (a ? 0 : 1) - (b ? 0 : 1);
-        }
-
         // Player
         function Player() {
             this.position = new Vector(0, 0);
@@ -478,6 +491,7 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
             this.fireRate = 0.2;
             this.angle = 0;
             this.aimPosition = new Vector(1,0);
+            this.gunAngle = 0;
             this.iceSmokeEmitter = new ParticleEmitter(images.icepuff, 100, 0.005, function(particle) {
                 if (!this.path) { return; }
                 particle.posx = this.path.lastPoint().x + rnd()*3;
@@ -517,6 +531,74 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
                 particle.active = particle.time > 0;
 
             }.bind(this));
+
+            this.gunIceFractalEmitter = new ParticleEmitter(images.icefractal, 100, null, function(particle) {
+                particle.posx = this.position.x + Math.cos(this.gunAngle) * 22;
+                particle.posy = this.position.y + Math.sin(this.gunAngle) * 22;
+                particle.velx = this.velocity.x + Math.cos(this.gunAngle + rnd() * 0.6) * 20;
+                particle.vely = this.velocity.y + Math.sin(this.gunAngle + rnd() * 0.6) * 20;//Math.random();
+                particle.rot = rnd() * Math.PI;
+                particle.rotrate = rnd() * 0.1;
+                particle.scale = 0.4;
+                particle.time = 0.5;
+                particle.active = true;
+            }.bind(this), function(particle,dt) {
+                // console.log(particle);
+                particle.posx += particle.velx;
+                particle.posy += particle.vely;
+                particle.rot += particle.rotrate;
+                particle.velx *= 0.95;
+                particle.vely *= 0.95;
+                particle.time -= dt;
+                particle.active = particle.time > 0;
+
+            }.bind(this), function(p, g) {
+                var t = 1 - p.time / 0.5;
+                g.context.globalAlpha = (t < 0.7 ? 1 : 1-unslide(t, 0.7, 1)) * 0.6;
+                // g.context.globalAlpha = 1;
+                g.context.save();
+                g.context.translate(p.posx, p.posy);
+                g.context.rotate(p.rot);
+                var s = slide(t, 0.2, 0.6);//(2-p.time)*0.3;
+                g.context.scale(s,s);
+                g.drawCenteredImage(this.image,0,0);
+                g.context.restore();
+                g.context.globalAlpha = 1;
+            });
+
+            this.gunIceSmokeEmitter = new ParticleEmitter(images.icepuff, 100, null, function(particle) {
+                particle.posx = this.position.x + Math.cos(this.gunAngle) * 22;
+                particle.posy = this.position.y + Math.sin(this.gunAngle) * 22;
+                particle.velx = this.velocity.x + Math.cos(this.gunAngle + rnd() * 0.6) * 20;
+                particle.vely = this.velocity.y + Math.sin(this.gunAngle + rnd() * 0.6) * 20;
+                particle.rot = rnd() * Math.PI;
+                particle.rotrate = rnd() * 0.1;
+                particle.scale = 0.5;
+                particle.time = 0.5;
+                particle.active = true;
+            }.bind(this), function(particle,dt) {
+                // console.log(particle);
+                particle.posx += particle.velx;
+                particle.posy += particle.vely;
+                particle.rot += particle.rotrate;
+                particle.velx *= 0.95;
+                particle.vely *= 0.95;
+                particle.time -= dt;
+                particle.active = particle.time > 0;
+
+            }.bind(this), function(p, g) {
+                var t = 1 - p.time / 0.5;
+                g.context.globalAlpha = (1-t)*0.8;
+                // g.context.globalAlpha = 1;
+                g.context.save();
+                g.context.translate(p.posx, p.posy);
+                g.context.rotate(p.rot);
+                var s = slide(t, 0.2, 0.6);//(2-p.time)*0.3;
+                g.context.scale(s,s);
+                g.drawCenteredImage(this.image,0,0);
+                g.context.restore();
+                g.context.globalAlpha = 1;
+            });
         }
         (function(p) {
             p.updatable = true;
@@ -531,6 +613,8 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
 
                 this.iceFractalEmitter.update(dt);
                 this.iceSmokeEmitter.update(dt);
+                this.gunIceFractalEmitter.update(dt);
+                this.gunIceSmokeEmitter.update(dt);
 
                 var maxspeed = 8;
                 if (this.line) {
@@ -596,6 +680,11 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
                     desiredAngle = Math.atan2(-this.line.normal.x, -this.line.normal.y);
                 }
                 this.angle = desiredAngle;
+
+                this.gunAngle = Math.atan2(
+                    this.aimPosition.y - this.position.y,
+                    this.aimPosition.x - this.position.x
+                );
             };
             p.draw = function(g) {
                 var me = this;
@@ -606,9 +695,12 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
                 // g.fillRectangle(this.position.x-5,this.position.y-5,10,10);
                 this.iceFractalEmitter.draw(g);
                 this.iceSmokeEmitter.draw(g);
+                this.gunIceFractalEmitter.draw(g);
+                this.gunIceSmokeEmitter.draw(g);
 
-                g.strokeStyle('blue');
-                g.strokeCircle(this.aimPosition.x, this.aimPosition.y, 30);
+                // Aim indicator
+                // g.strokeStyle('blue');
+                // g.strokeCircle(this.aimPosition.x, this.aimPosition.y, 30);
 
                 g.translate(this.position.x, this.position.y, function() {
                     g.context.scale(1, -1);
@@ -620,12 +712,8 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
                         g.drawCenteredImage(images.player_body, 0, 0);
                     }.bind(this))
 
-                    var gunAngle = Math.atan2(
-                        this.aimPosition.y - this.position.y,
-                        this.aimPosition.x - this.position.x
-                    );
                     g.context.scale(1,-1);
-                    g.rotate(0,0,gunAngle, function() {
+                    g.rotate(0,0,this.gunAngle, function() {
                         g.drawCenteredImage(images.player_gun, 25, 0);
                     }.bind(this));
                 }.bind(this));
@@ -670,18 +758,30 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
             p.endPath = function() {
                 this.iceFractalEmitter.spawn(10);
                 this.path = null;
-            },
+            };
             p.fire = function(x,y) {
+                this.gunIceFractalEmitter.spawn(3);
+                this.gunIceSmokeEmitter.spawn(3);
                 if (this.fireCooldown > 0) { return; }
                 var t = new Vector(x,y);
                 t.substractV(this.position);
                 t.normalize();
                 t.multiply(20);
-                var bullet = new Bullet(this, images.icebullet,
-                    this.position.x, this.position.y,
-                    t.x, t.y);
+                var bullet = new IceBullet(this, this.position.x, this.position.y, t.x, t.y);
                 game.objects.add(bullet);
                 this.fireCooldown = this.fireRate;
+            };
+            p.damage = function(amount,position) {
+                this.line = null;
+                if (this.path) {
+                    this.endPath();
+                }
+                this.velocity.setV(this.position);
+                this.velocity.substractV(position);
+                this.velocity.normalizeOrZero();
+                this.velocity.multiply(6);
+
+                game.changeState(diedState());
             };
         })(Player.prototype);
 
@@ -742,6 +842,7 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
             this.angle = angle === undefined ? Math.atan2(this.velocity.y, this.velocity.x) : angle;
             this.angleRate = angleRate || 0;
             this.damage = damage || 1;
+            this.time = 3;
             this.touchRadius = 5;
         }
         (function(p) {
@@ -756,6 +857,10 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
             p.update = function(dt) {
                 this.position.addV(this.velocity);
                 this.angle += this.angleRate * dt;
+                this.time -= dt;
+                if (this.time < 0) {
+                    game.objects.remove(this);
+                }
             };
             p.touch = function(other) {
                 if (other === this.owner) { return; }
@@ -764,6 +869,20 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
                 game.objects.remove(this);
             }
         })(Bullet.prototype);
+
+        function IceBullet(owner, x, y, vx, vy) {
+            Bullet.call(this, owner, null, x, y, vx, vy, 0, 0, 1);
+            this.time = 0.2;
+        }
+        IceBullet.prototype = new Bullet();
+        (function(p) {
+            p.update = function(dt) {
+                Bullet.prototype.update.call(this, dt);
+                this.touchRadius = slide(unslide(this.time, 0.2, 0), 20, 100);
+            };
+            p.drawForeground = function(g) {
+            };
+        })(IceBullet.prototype);
 
         function Enemy(image, x, y, vx, vy, health) {
             this.position = new Vector(x,y);
@@ -795,7 +914,15 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
                 this.health -= amount;
                 this.damageTime = 0.1;
                 if (this.health <= 0) {
+                    audio.bigexplosion01.play();
                     game.objects.remove(this);
+                } else {
+                    pick(audio.explosions).play();
+                }
+            };
+            p.touch = function(other) {
+                if (other === player) {
+                    other.damage(1,this.position);
                 }
             };
         })(Enemy.prototype);
@@ -843,27 +970,76 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
                     }.bind(this));
                 }.bind(this));
 
-                g.strokeStyle('red');
-                g.strokeCircle(this.position.x, this.position.y, this.touchRadius);
+                // g.strokeStyle('red');
+                // g.strokeCircle(this.position.x, this.position.y, this.touchRadius);
             };
         })(Helicopter.prototype);
-        game.chains.draw.push(function(g,next) {
-            g.fillStyle('white');
-            g.fillRectangle(-100,-100,200,200);
-            g.strokeStyle('red');
-            g.strokeLine(0,0,100,0);
-            g.strokeStyle('blue');
-            g.strokeLine(0,0,0,100);
-            next(g);
-        });
+        // game.chains.draw.push(function(g,next) {
+        //     g.fillStyle('white');
+        //     g.fillRectangle(-100,-100,200,200);
+        //     g.strokeStyle('red');
+        //     g.strokeLine(0,0,100,0);
+        //     g.strokeStyle('blue');
+        //     g.strokeLine(0,0,0,100);
+        //     next(g);
+        // });
 
-        game.objects.add(player = new Player());
-        setInterval(function() {
-            // game.objects.add(new Bullet(null, images.enemy, game.camera.x + game.width, 200, -1, 0));
-            game.objects.add(new Helicopter(game.camera.x + game.width, 0, -1, 0, 5));
-        },3000);
+
+        function getAimPosition(t) {
+            game.camera.screenToWorld(game.mouse, t);
+        }
 
         //#states
+        function startgameState() {
+            var me = {
+                enabled: false,
+                enable: enable,
+                disable: disable
+            };
+            function enable() {
+                // Initialize game
+                game.objects.clear();
+                player = null;
+                game.objects.add(player = new Player());
+                game.camera.reset();
+                
+                // player.position.set(0,0);
+                player.position.set(-700, 0);
+                player.velocity.set(0.5*100,0.5*100);
+
+                g.chains.update.insertBefore(update, g.chains.update.objects);
+                g.chains.draw.insertBefore(draw, g.chains.draw.camera);
+                g.on('mousedown', mousedown);
+            }
+
+            function disable() {
+                g.chains.update.remove(update);
+                g.chains.draw.remove(draw);
+                g.removeListener('mousedown', mousedown);
+            }
+
+            function update(dt, next) {
+                // next(dt);
+            }
+
+            function draw(g, next) {
+                // Draw HUD
+                next(g);
+
+                g.drawCenteredImage(images.instructions, game.width / 2 + 10, game.height / 2);
+            }
+
+            function mousedown(button) {
+                var t = new Vector(0,0);
+                getAimPosition(t);
+                if (button === 0) {
+                    player.startPath(t.x,t.y);
+                    game.changeState(gameplayState());
+                }
+            }
+            return me;
+        }
+
         function gameplayState() {
             var me = {
                 enabled: false,
@@ -889,10 +1065,94 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
             function keydown(key) {
                 if (key === 'x' || key === 'w' || key === 'space' || key === 'z') {
                 } else if (key === 'r') {
+                    game.changeState(startgameState());
                 }
             }
 
+
+            // setInterval(function() {
+            //     // game.objects.add(new Bullet(null, images.enemy, game.camera.x + game.width, 200, -1, 0));
+            //     game.objects.add(new Helicopter(game.camera.x + game.width, 0, -1, 0, 5));
+            // },3000);
+
+            function spawnEnemy(x,y,vx,vy) {
+                return function(keyPoint) {
+                    game.objects.add(new Helicopter(keyPoint.x + (x || 0) + game.width + 200, (y || 0), vx || -1, vy || 0, 5));
+                }
+            }
+
+            function combine(/*...*/) {
+                var args = Array.prototype.slice.call(arguments,0);
+                return function(keyPoint) {
+                    args.forEach(function(fn) {
+                        fn(keyPoint);
+                    });
+                };
+            }
+
+            function log(/*...*/) {
+                return function(keyPoint) {
+                    var args = Array.prototype.slice.call(arguments,0);
+                    args.unshift('LOG');
+                    args.push(keyPoint);
+                    console.log.apply(console, args);
+                }
+            }
+
+            var pause = 2000;
+            var level = [
+                [pause*2, spawnEnemy(0, 0)],
+
+                [pause, spawnEnemy(0, -150)],
+                [500, spawnEnemy(0, 150)],
+                [500, spawnEnemy(0, -150)],
+
+                [pause, combine(spawnEnemy(0,-150), spawnEnemy(0,150))],
+
+                [pause, spawnEnemy(0, 0)],
+                [300, combine(spawnEnemy(0,-150), spawnEnemy(0,150))],
+
+                [pause, spawnEnemy(0, -150)],
+                [500, spawnEnemy(0, 150)],
+                [500, spawnEnemy(0, -150)],
+
+                [pause*2, function(keyPoint) { game.changeState(wonState()); }],
+
+                [9999999, combine(spawnEnemy(0, 0), spawnEnemy(0,-100), spawnEnemy(0,100))],
+            ];
+
+            
+            function getNextKeyPoint(x) {
+                var i = 0;
+                var nextX = 0;
+                while(level[i][0] <= x) {
+                    x -= level[i][0];
+                    nextX += level[i][0];
+                    i++;
+                }
+                nextX += level[i][0];
+
+                var nextLevel = level[i];
+
+                var keyPoint = {
+                    x: nextX
+                };
+                keyPoint.trigger = nextLevel[1].bind(null, keyPoint);
+                return keyPoint;
+            }
+
+            var time = 0;
+            var currentCameraX = 0;
+            var nextKeyPoint = getNextKeyPoint(0);
             function update(dt, next) {
+                var newCameraX = game.camera.x + game.width;
+                while(nextKeyPoint.x < newCameraX) {
+                    currentCameraX = nextKeyPoint.x;
+                    nextKeyPoint.trigger();
+                    nextKeyPoint = getNextKeyPoint(currentCameraX);
+                }
+                currentCameraX = newCameraX;
+
                 var t = new Vector(0,0);
                 getAimPosition(t);
 
@@ -906,15 +1166,15 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
                 }
 
                 next(dt);
+
+                if (player.position.y < -390 || player.health < 0) {
+                    game.changeState(diedState());
+                }
             }
 
             function draw(g, next) {
                 // Draw HUD
                 next(g);
-            }
-
-            function getAimPosition(t) {
-                game.camera.screenToWorld(game.mouse, t);
             }
 
             function mousedown(button) {
@@ -930,6 +1190,100 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
                     player.endPath();
                 }
             }
+            return me;
+        }
+
+
+        function diedState() {
+            var me = {
+                enabled: false,
+                enable: enable,
+                disable: disable
+            };
+            function enable() {
+                audio.hurt.play();
+                // g.chains.update.unshift(update);
+                g.chains.draw.insertBefore(draw, g.chains.draw.camera);
+                g.on('mousedown', mousedown);
+                // g.on('mouseup', mouseup);
+                // g.on('keydown',keydown);
+            }
+
+            function mousedown(button) {
+                console.log(button);
+                if (button === 0) {
+                    console.log('change state');
+                    game.changeState(startgameState());
+                }
+            }
+
+            function disable() {
+                // g.chains.update.remove(update);
+                g.chains.draw.remove(draw);
+                g.removeListener('mousedown', mousedown);
+                // g.removeListener('mouseup', mouseup);
+                // g.removeListener('keydown',keydown);
+            }
+
+            var updateCount = 0;
+            function update(dt, next) {
+                if (updateCount % 10 === 0) {
+                    next(dt);
+                }
+                updateCount++;
+            }
+
+            function draw(g,next) {
+                next(g);
+                g.fillStyle('rgba(0,0,0,0.5)');
+                g.fillRectangle(0,0,game.width,game.height);
+                g.drawCenteredImage(images.youdied,game.width/2,game.height/2);
+            }
+
+            return me;
+        }
+
+        function wonState() {
+            var me = {
+                enabled: false,
+                enable: enable,
+                disable: disable
+            };
+            function enable() {
+                audio.won.play();
+                g.chains.update.unshift(update);
+                g.chains.draw.insertBefore(draw, g.chains.draw.camera);
+                g.on('mousedown', mousedown);
+                // g.on('mouseup', mouseup);
+                // g.on('keydown',keydown);
+            }
+
+            function update(dt, next) {
+                // Pause the game.
+            }
+            function mousedown(button) {
+                console.log(button);
+                if (button === 0) {
+                    console.log('change state');
+                    game.changeState(startgameState());
+                }
+            }
+
+            function disable() {
+                // g.chains.update.remove(update);
+                g.chains.draw.remove(draw);
+                g.removeListener('mousedown', mousedown);
+                // g.removeListener('mouseup', mouseup);
+                // g.removeListener('keydown',keydown);
+            }
+
+            function draw(g,next) {
+                next(g);
+                g.fillStyle('rgba(0,0,0,0.5)');
+                g.fillRectangle(0,0,game.width,game.height);
+                g.drawCenteredImage(images.youwon,game.width/2,game.height/2);
+            }
+
             return me;
         }
 
@@ -964,8 +1318,23 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
             return (Math.random()-0.5) * 2;
         }
 
+        function scale(v, min, max) {
+            return min + (max-min)*v;
+        }
 
-        g.changeState(gameplayState());
+        function slide(v, min, max) {
+            return min + v * (max - min);
+        }
+
+        function unslide(v, min, max) {
+            return (v - min) / (max-min);
+        }
+
+        function pick(arr) {
+            return arr[Math.floor(Math.random()*arr.length)];
+        }
+
+        g.changeState(startgameState());
         game.objects.handlePending();
         g.start();
     }

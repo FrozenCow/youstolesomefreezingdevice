@@ -17,7 +17,9 @@ define(['intrusivelist','dintrusivelist'],function(IntrusiveList,DIntrusiveList)
 		return list;
 	};
 	p.remove = function(o) {
-		this.pendingRemove.push(o);
+		if (!this.pendingRemove.contains(o)) {
+			this.pendingRemove.push(o);
+		}
 	};
 	p.clear = function(o) {
 		var me = this;

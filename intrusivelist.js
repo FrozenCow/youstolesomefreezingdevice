@@ -7,12 +7,12 @@ define(function() {
 	}
 	var p = IntrusiveList.prototype;
 	p.push = function(o) {
-		if (this._nextProp in o) { throw "Already in list"; }
+		if (this._nextProp in o) { throw (typeof o) + ' ' + o.constructor + " already in list " + this._nextProp; }
 		o[this._nextProp] = this.root;
 		this.root = o;
 	};
 	p.pop = function() {
-		if (!(this._nextProp in o)) { throw "Not in list"; }
+		if (!(this._nextProp in o)) { throw (typeof o) + ' ' + o.constructor + " not in list " + this._nextProp; }
 		var o = this.root;
 		this.root = o[this._nextProp];
 		return o;
@@ -40,6 +40,16 @@ define(function() {
 			prev = o;
 			o = next;
 		}
+	};
+	p.contains = function(findElement) {
+		var result = false;
+		this.each(function(element, BREAK) {
+			if (element === findElement) {
+				result = true;
+				return BREAK;
+			}
+		});
+		return result;
 	};
 	return IntrusiveList;
 });

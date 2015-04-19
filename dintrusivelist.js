@@ -14,7 +14,7 @@ define(function() {
 	}
 	var p = DIntrusiveList.prototype;
 	p.push = function(o) {
-		if (this._nextProp in o) { throw "Already in list"; }
+		if (this._nextProp in o) { throw (typeof o) + ' ' + o.constructor + " already in list " + this._nextProp; }
 		var next = this.root;
 		if (next) {
 			next[this._prevProp] = o;
@@ -36,7 +36,7 @@ define(function() {
 		this.remove(this.root);
 	};
 	p.remove = function(o) {
-		if (!(this._nextProp in o)) { throw "Not in list"; }
+		if (!(this._nextProp in o)) { throw (typeof o) + ' ' + o.constructor + " not in list " + this._nextProp; }
 		var prev = o[this._prevProp];
 		var next = o[this._nextProp];
 		if (this.root === o) {
