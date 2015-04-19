@@ -1038,7 +1038,7 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
             function mousedown(button) {
                 var t = new Vector(0,0);
                 getAimPosition(t);
-                if (button === 0) {
+                if (button === 2) {
                     player.startPath(t.x,t.y);
                     game.changeState(gameplayState());
                 }
@@ -1107,7 +1107,7 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
 
             var pause = 2000;
             var level = [
-                [pause*2, spawnEnemy(0, 0)],
+                [pause*1.5, spawnEnemy(0, 0)],
 
                 [pause, spawnEnemy(0, -150)],
                 [500, spawnEnemy(0, 150)],
@@ -1167,7 +1167,7 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
                 // Post update
                 if (player.path) {
                     player.growPath(t.x,t.y);
-                } else if (game.mouse.buttons[2]) {
+                } else if (game.mouse.buttons[0]) {
                     player.fire(t.x,t.y);
                 }
 
@@ -1186,13 +1186,13 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
             function mousedown(button) {
                 var t = new Vector(0,0);
                 getAimPosition(t);
-                if (button === 0) {
+                if (button === 2) {
                     player.startPath(t.x,t.y);
                 }
             }
 
             function mouseup(button) {
-                if (button === 0) {
+                if (button === 2) {
                     player.endPath();
                 }
             }
