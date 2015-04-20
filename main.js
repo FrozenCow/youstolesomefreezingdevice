@@ -2,7 +2,8 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
     var t = new Vector(0, 0);
     var t2 = new Vector(0, 0);
     var rs = {
-        'images': ['background','ice','icepuff','enemy','bullet','icebullet','icefractal',
+        'images': ['background','mountains',
+        'ice','icepuff','enemy','bullet','icebullet','icefractal',
         'helicopter_body','helicopter_main_propellor','helicopter_tail_propellor','helicopter_gun',
         'player_body', 'player_gun', 'player_hand',
         'youdied','youwon','instructions'],
@@ -230,6 +231,21 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
                 for(var y=topLeft.y;y<bottomRight.y;y+=image.height) {
                     g.drawImage(image, x, y);
                 }
+
+
+                image=images.mountains;
+
+                topLeft.x = Math.floor(topLeft.x / image.width) * image.width;
+                topLeft.y = Math.floor(topLeft.y / image.height) * image.height;
+
+                bottomRight.x = Math.ceil(bottomRight.x / image.width) * image.width;
+                bottomRight.y = Math.ceil(bottomRight.y / image.height) * image.height;
+                y = -100;
+                g.scale(0,y,1,-1,function() {
+                    for(var x=topLeft.x;x<bottomRight.x;x+=image.width) {
+                        g.drawImage(image, x, y);
+                    }
+                })
 
                 next(g);
 
