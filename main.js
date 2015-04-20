@@ -1269,7 +1269,7 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
             }
 
             function disable() {
-                // g.chains.update.remove(update);
+                g.chains.update.remove(update);
                 g.chains.draw.remove(draw);
                 g.removeListener('mousedown', mousedown);
                 // g.removeListener('mouseup', mouseup);
