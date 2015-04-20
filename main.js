@@ -210,46 +210,23 @@ define(['platform', 'game', 'vector', 'staticcollidable', 'linesegment', 'editor
 
         // Draw background
         (function() {
-            var topLeft = new Vector(0,0);
-            var bottomRight = new Vector(0,0);
-            game.chains.draw.insertAfter(function(g,next) {
-                var image = images.background;
-                game.camera.screenToWorld(new Vector(0,0), topLeft);
-                game.camera.screenToWorld(new Vector(game.width,game.height), bottomRight);
+            game.chains.draw.insertBefore(function(g,next) {
+                fill(g,images.background, game.camera.x * 0.5, game.camera.y, game.width, game.height);
+                g.translate(0,game.height-images.mountains.height+100,function() {
+                    fill(g,images.mountains, game.camera.x * 0.8, game.camera.y, game.width, 0);
+                });
+                next(g);
+            },game.chains.draw.camera);
 
-                var k = topLeft.y;
-                topLeft.y = bottomRight.y;
-                bottomRight.y = k;
-
-                topLeft.x = Math.floor(topLeft.x / image.width) * image.width;
-                topLeft.y = Math.floor(topLeft.y / image.height) * image.height;
-
-                bottomRight.x = Math.ceil(bottomRight.x / image.width) * image.width;
-                bottomRight.y = Math.ceil(bottomRight.y / image.height) * image.height;
-
-                for(var x=topLeft.x;x<bottomRight.x;x+= image.width)
-                for(var y=topLeft.y;y<bottomRight.y;y+=image.height) {
+            function fill(g,image,originx,originy, width, height) {
+                var startx = Math.floor(originx / image.width) * image.width - originx;
+                var starty = Math.floor(originy / image.height) * image.height - originy;
+                for(var x=startx;x<width;x += image.width) {
+                for(var y=starty;y<height;y +=image.height) {
                     g.drawImage(image, x, y);
                 }
-
-
-                image=images.mountains;
-
-                topLeft.x = Math.floor(topLeft.x / image.width) * image.width;
-                topLeft.y = Math.floor(topLeft.y / image.height) * image.height;
-
-                bottomRight.x = Math.ceil(bottomRight.x / image.width) * image.width;
-                bottomRight.y = Math.ceil(bottomRight.y / image.height) * image.height;
-                y = -100;
-                g.scale(0,y,1,-1,function() {
-                    for(var x=topLeft.x;x<bottomRight.x;x+=image.width) {
-                        g.drawImage(image, x, y);
-                    }
-                })
-
-                next(g);
-
-            },game.chains.draw.camera);
+                }
+            }
         })();
 
         // Collision
